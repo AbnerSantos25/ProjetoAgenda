@@ -1,0 +1,88 @@
+﻿@page "/contacts"
+@using AgendaProjeto.Models
+@using AgendaProjeto.Services
+@rendermode InteractiveServer
+@inject IAddressBookService AddressBookService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+@using Microsoft.FluentUI.AspNetCore.Components
+
+<div class="d-flex justify-content-end">
+    <FluentButton Appearance="Appearance.Accent" OnClick="RegisterContact">Adicionar Novo Contato</FluentButton>
+</div>
+
+
+<h3>Lista de Contatos</h3>
+
+@if (contacts != null && contacts.Any())
+{
+    <FluentDataGrid @ref="grid" Items="@contactQueryable" Pagination="@pagination" ResizableColumns="true" Style="overflow: auto;">
+        <PropertyColumn Property="@(c => c.Name)" Sortable="true" Title="Nome" Align="Align.Center" Tooltip="true" />
+        <PropertyColumn Property="@(c => c.PrincipalPhone.Number)" Title="Número Principal" Sortable="true" Align="Align.Center" Tooltip="true" />
+        <TemplateColumn Align="@Align.End">
+            <FluentButton IconEnd="@(new Icons.Regular.Size16.Info())" OnClick="@(() => ShowMoreInfo(context))" />
+            <FluentButton IconEnd="@(new Icons.Regular.Size16.Edit())" OnClick="@(() => ShowEdit(context))" />
+            <FluentButton IconEnd="@(new Icons.Regular.Size16.Delete())" OnClick="@(() => Delete(context))" />
+        </TemplateColumn>
+    </FluentDataGrid>
+
+    <FluentPaginator State="@pagination" />
+}
+else
+{
+    <p>Nenhum contato encontrado.</p>
+}
+
+@code {
+    private List<Contact> contacts;
+    IQueryable<Contact> contactQueryable;
+    PaginationState pagination = new PaginationState { ItemsPerPage = 5 };
+    FluentDataGrid<Contact> grid = default!;
+    protected override async Task OnInitializedAsync()
+    {
+        GetData();
+    }
+
+    private void GetData()
+    {
+        var addressBook = AddressBookService.GetAddressBook();
+        contacts = addressBook.Contacts;
+        contactQueryable = contacts.AsQueryable();
+        StateHasChanged();
+    }
+
+    private async Task ShowEdit(Contact contact)
+    {
+        NavigationManager.NavigateTo($"{contact.Id}/editar");
+    }
+
+    private async Task ShowMoreInfo(Contact contact)
+    {
+        NavigationManager.NavigateTo($"{contact.Id}");
+    }
+
+    private async void Delete(Contact contact)
+    {
+        var dialog = await DialogService.ShowDialogAsync<ConfirmDialog>(null, new DialogParameters()
+            {
+                Height = "200px",
+                Title = "Confirmar Exclusão",
+                PreventDismissOnOverlayClick = true,
+                PreventScroll = true,
+            });
+
+        var result = await dialog.Result;
+
+        if (!result.Cancelled)
+        {
+            AddressBookService.RemoveContact(contact.Id);
+            GetData();
+        }
+    }
+
+    private void RegisterContact()
+    {
+        NavigationManager.NavigateTo("/registrar");
+    }
+}
